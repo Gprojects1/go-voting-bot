@@ -1,0 +1,30 @@
+# Используем официальный образ Go
+FROM golang:1.23 AS builder
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем go.mod и go.sum для кэширования зависимостей
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Копируем остальные файлы
+COPY . .
+
+# Устанавливаем OpenSSL (для Debian-based образа)
+RUN apt-get update && apt-get install -y openssl libssl-dev # <-- ИЗМЕНЕНО
+
+# Компилируем приложение
+RUN GOOS=linux go build -o go-voting-bot ./cmd/main.go
+
+# Используем минимальный образ для запуска
+FROM alpine:latest
+
+# Устанавливаем необходимые библиотеки
+RUN apk --no-cache add ca-certificates # <-- ИЗМЕНЕНО
+
+# Копируем скомпилированное приложение из предыдущего этапа
+COPY --from=builder /app/go-voting-bot /go-voting-bot
+
+# Указываем команду для запуска
+ENTRYPOINT ["/go-voting-bot"]
