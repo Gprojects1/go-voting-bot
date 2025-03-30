@@ -6,8 +6,12 @@ import (
 	"go-voting-bot/pkg/utils"
 	"time"
 
+	"context"
+	"go-voting-bot/pkg/errors"
+	"log/slog"
+
 	"github.com/mitchellh/mapstructure"
-	"github.com/tarantool/go-tarantool"
+	"github.com/tarantool/go-tarantool/v2"
 )
 
 type VotingRepository interface {
@@ -17,16 +21,23 @@ type VotingRepository interface {
 }
 
 type votingRepository struct {
-	Conn *tarantool.Connection
+	Conn   *tarantool.Connection
+	Logger *slog.Logger
 }
 
 func NewTarantoolClient(host string, port string, user string, password string) (*votingRepository, error) {
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := fmt.Sprintf("%s:%s", host, port)
 
-	conn, err := tarantool.Connect(addr, tarantool.Opts{
-		User: user,
-		Pass: password,
-	})
+	dialer := tarantool.NetDialer{
+		Address:  addr,
+		User:     "guest",
+		Password: "",
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	conn, err := tarantool.Connect(ctx, dialer, tarantool.Opts{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Tarantool: %w", err)
 	}
@@ -51,7 +62,10 @@ func (t *votingRepository) SaveVoting(voting model.Voting) (model.Voting, error)
 		utils.ConvertResultsToMapStringInterface(voting.Results),
 	})
 	if err != nil {
-		return model.Voting{}, fmt.Errorf("failed to save voting: %w", err)
+		t.Logger.Error("can't save record with this id", slog.String("id", voting.ID))
+		err = errors.Wrapf(err, errors.NotSaved.Message())
+		err = errors.AddErrorContext(err, voting.ID, "can't save record with this id")
+		return model.Voting{}, err
 	}
 	return voting, nil
 }
@@ -71,15 +85,24 @@ func (t *votingRepository) GetVoting(votingID string) (model.Voting, error) {
 
 	resp, err := t.Conn.Select("votings", "primary", 0, 1, tarantool.IterEq, []interface{}{votingID})
 	if err != nil {
-		return model.Voting{}, fmt.Errorf("failed to get voting from Tarantool: %w", err)
+		t.Logger.Error("Failed to get voting from Tarantool", slog.String("id", votingID))
+		err = errors.Wrapf(err, errors.NotFound.Message())
+		err = errors.AddErrorContext(err, votingID, "Failed to get voting from Tarantool")
+		return model.Voting{}, err
 	}
 
-	if len(resp.Data) == 0 {
-		return model.Voting{}, fmt.Errorf("voting not found for ID: %s", votingID)
+	if len(resp) == 0 {
+		t.Logger.Error("Voting not found for ID", slog.String("id", votingID))
+		err = errors.Wrapf(err, errors.WrongType.Message())
+		err = errors.AddErrorContext(err, votingID, "Voting not found for ID")
+		return model.Voting{}, err
 	}
 
-	if err := mapstructure.Decode(resp.Data[0], &result); err != nil {
-		return model.Voting{}, fmt.Errorf("failed to decode voting data: %w", err)
+	if err := mapstructure.Decode(resp[0], &result); err != nil {
+		t.Logger.Error("Failed to decode voting data", slog.String("id", votingID))
+		err = errors.Wrapf(err, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, votingID, "Failed to decode voting data")
+		return model.Voting{}, err
 	}
 
 	voting := model.Voting{
@@ -100,7 +123,10 @@ func (t *votingRepository) GetVoting(votingID string) (model.Voting, error) {
 func (t *votingRepository) DeleteVoting(votingID string) (string, error) {
 	_, err := t.Conn.Delete("votings", "primary", []interface{}{votingID})
 	if err != nil {
-		return "", fmt.Errorf("failed to delete voting: %w", err)
+		t.Logger.Error("Failed to delete voting data", slog.String("id", votingID))
+		err = errors.Wrapf(err, errors.NotFound.Message())
+		err = errors.AddErrorContext(err, votingID, "Failed to delete voting data")
+		return "", err
 	}
 	return votingID, nil
 }

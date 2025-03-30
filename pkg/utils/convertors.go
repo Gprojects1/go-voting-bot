@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"fmt"
+	"log"
 	"strconv"
 )
 
@@ -39,12 +39,12 @@ func ConvertMapStringInterfaceToResults(data map[string]interface{}) map[int]int
 	for key, value := range data {
 		keyInt, err := strconv.Atoi(key)
 		if err != nil {
-			fmt.Printf("Error converting key '%s' to int: %v\n", key, err) //erroring
+			log.Printf("Error converting key '%s' to int: %v\n", key, err) //erroring
 			continue
 		}
 		valueInt64, ok := value.(int64)
 		if !ok {
-			fmt.Printf("Error converting value for key '%s' to int64: value is of type %T\n", key, value) //erroring
+			log.Printf("Error converting value for key '%s' to int64: value is of type %T\n", key, value) //erroring
 			continue
 		}
 		valueInt := int(valueInt64)

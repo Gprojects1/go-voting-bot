@@ -2,6 +2,7 @@ package service
 
 import (
 	"go-voting-bot/pkg/dto"
+	"go-voting-bot/pkg/errors"
 	"go-voting-bot/pkg/model"
 	"go-voting-bot/pkg/repository"
 	"go-voting-bot/pkg/utils"
@@ -22,9 +23,10 @@ func (s *VotingService) AddNewVoting(request dto.VotingRequest, channelID, userI
 	parts := strings.Split(request.Text, "|")
 	if len(parts) < 3 {
 		s.Logger.Error("Invalid format: requires question and at least two options", slog.String("text", request.Text))
-		s.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали вопрос и как минимум два варианта ответа.  Пример: /create Вопрос | Вариант 1 | Вариант 2")
-
-		return model.Voting{}, nil
+		s.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали вопрос и как минимум два варианта ответа.  Пример: /poll create Вопрос | Вариант 1 | Вариант 2")
+		err := errors.BadRequest.Wrapf(nil, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, "message", "wrong question format, should be /poll create question | ans 1 | ans 2")
+		return model.Voting{}, err
 	}
 
 	question := strings.TrimSpace(parts[0])
@@ -35,7 +37,9 @@ func (s *VotingService) AddNewVoting(request dto.VotingRequest, channelID, userI
 
 	if question == "" || len(options) < 2 {
 		s.PostEphemeralMessage(channelID, userID, "Необходимо указать вопрос и как минимум два варианта ответа.")
-		return model.Voting{}, nil
+		err := errors.BadRequest.Wrapf(nil, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, "message", "wrong question format, should be /poll create question | ans 1 | ans 2 ...")
+		return model.Voting{}, err
 	}
 
 	voting := model.Voting{
@@ -55,8 +59,10 @@ func (s *VotingService) AddNewVote(request dto.VotingRequest, channelID, userID 
 	parts := strings.Split(request.Text, " ")
 	if len(parts) != 2 {
 		s.Logger.Error("Invalid format: requires voting id and 1 answer", slog.String("text", request.Text))
-		s.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали вопрос и как минимум два варианта ответа.Пример: /vote <id голосования> <номер варианта>")
-		return model.Voting{}, nil
+		s.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали /poll vote <id голосования> <номер варианта>")
+		err := errors.BadRequest.Wrapf(nil, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, "message", "wrong question format, should be /poll <vote voting id> <answer variant> ")
+		return model.Voting{}, err
 	}
 
 	votingID := strings.TrimSpace(parts[0])
@@ -65,6 +71,8 @@ func (s *VotingService) AddNewVote(request dto.VotingRequest, channelID, userID 
 	optionNumber, err := utils.ParseInt(optionNumberStr)
 	if err != nil {
 		s.PostEphemeralMessage(channelID, userID, "Номер варианта должен быть числом.")
+		err = errors.BadRequest.Wrapf(err, errors.WrongType.Message())
+		err = errors.AddErrorContext(err, "id", "wrong id format, should be an integer")
 		return model.Voting{}, err
 	}
 
@@ -77,11 +85,15 @@ func (s *VotingService) AddNewVote(request dto.VotingRequest, channelID, userID 
 
 	if !voting.IsActive {
 		s.PostEphemeralMessage(channelID, userID, "Голосование завершено и больше не принимает голоса.")
+		err = errors.BadRequest.Wrapf(err, errors.UnavailableResource.Message())
+		err = errors.AddErrorContext(err, "id", "Voting is finished")
 		return model.Voting{}, err
 	}
 
 	if optionNumber < 1 || optionNumber > len(voting.Options) {
 		s.PostEphemeralMessage(channelID, userID, "Неверный номер варианта.")
+		err = errors.BadRequest.Wrapf(err, errors.BadRequest.Message())
+		err = errors.AddErrorContext(err, "answer", "Wrong answer variant")
 		return model.Voting{}, err
 	}
 
@@ -93,8 +105,11 @@ func (s *VotingService) AddNewVote(request dto.VotingRequest, channelID, userID 
 func (s *VotingService) GetResultsByVotingId(request dto.VotingRequest, channelID string, userID string) (dto.VotingResultsResponse, string, error) {
 	votingID := strings.TrimSpace(request.Text)
 	if votingID == "" {
-		s.PostEphemeralMessage(channelID, userID, "Используйте: /results <id голосования>")
-		return dto.VotingResultsResponse{}, "", nil
+		s.Logger.Error("Wrong question format, should be /poll results <voting id>", slog.String("text", request.Text))
+		s.PostEphemeralMessage(channelID, userID, "Используйте: /poll results <id голосования>")
+		err := errors.BadRequest.Wrapf(nil, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, "message", "wrong question format, should be /poll results <voting id>")
+		return dto.VotingResultsResponse{}, "", err
 	}
 	voting, err := s.VoteRepo.GetVoting(votingID)
 	if err != nil {
@@ -129,8 +144,11 @@ func (s *VotingService) GetResultsByVotingId(request dto.VotingRequest, channelI
 func (s *VotingService) EndVotingByVotingId(request dto.VotingRequest, channelID, userID string) (string, error) {
 	votingID := strings.TrimSpace(request.Text)
 	if votingID == "" {
-		s.PostEphemeralMessage(channelID, userID, "Использование: /end <id голосования>")
-		return "", nil
+		s.Logger.Error("Wrong question format, should be /poll end <voting id>", slog.String("text", request.Text))
+		s.PostEphemeralMessage(channelID, userID, "Использование: /poll end <id голосования>")
+		err := errors.BadRequest.Wrapf(nil, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, "message", "wrong question format, should be /poll end <voting id>")
+		return "", err
 	}
 
 	voting, err := s.VoteRepo.GetVoting(votingID)
@@ -142,12 +160,13 @@ func (s *VotingService) EndVotingByVotingId(request dto.VotingRequest, channelID
 
 	if voting.CreatorID != userID {
 		s.PostEphemeralMessage(channelID, userID, "Вы не являетесь создателем этого голосования.")
-		return "", nil
+		err := errors.BadRequest.Wrapf(nil, errors.UnavailableResource.Message())
+		err = errors.AddErrorContext(err, "id", "You are not a creator of this voting")
+		return "", err
 	}
 
 	voting.IsActive = false
 	voting.ClosedAt = time.Now()
-	//delete voting
 	_, err = s.VoteRepo.SaveVoting(voting)
 
 	s.Logger.Info("Voting ended", slog.String("voting_id", votingID), slog.String("user_id", userID))
@@ -157,8 +176,11 @@ func (s *VotingService) EndVotingByVotingId(request dto.VotingRequest, channelID
 func (s *VotingService) DeleteVotingByVotingId(request dto.VotingRequest, channelID, userID string) (string, error) {
 	votingID := strings.TrimSpace(request.Text)
 	if votingID == "" {
-		s.PostEphemeralMessage(channelID, userID, "Используйте: /delete <id голосования>")
-		return "", nil
+		s.Logger.Error("Wrong question format, should be /poll delete <voting id>", slog.String("text", request.Text))
+		err := errors.BadRequest.Wrapf(nil, errors.InvalidFormat.Message())
+		err = errors.AddErrorContext(err, "message", "wrong question format, should be /poll delete <voting id>")
+		s.PostEphemeralMessage(channelID, userID, "Используйте: /poll delete <id голосования>")
+		return "", err
 	}
 
 	voting, err := s.VoteRepo.GetVoting(votingID)
@@ -170,6 +192,8 @@ func (s *VotingService) DeleteVotingByVotingId(request dto.VotingRequest, channe
 
 	if voting.CreatorID != userID {
 		s.PostEphemeralMessage(channelID, userID, "Вы не являетесь создателем этого голосования.")
+		err := errors.BadRequest.Wrapf(nil, errors.UnavailableResource.Message())
+		err = errors.AddErrorContext(err, "id", "You are not a creator of this voting")
 		return "", err
 	}
 	s.Logger.Info("Voting deleted", slog.String("voting_id", votingID), slog.String("user_id", userID))

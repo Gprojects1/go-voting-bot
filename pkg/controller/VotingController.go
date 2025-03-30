@@ -16,18 +16,13 @@ type VotingController struct {
 	Logger  *slog.Logger
 }
 
-func (con *VotingController) CreateVoting(c *gin.Context) {
-	channelID := c.PostForm("channel_id")
-	userID := c.PostForm("user_id")
+func (con *VotingController) CreateVoting(c *gin.Context, CommandRequest dto.CommandRequest) {
+	channelID := CommandRequest.ChannelID
+	userID := CommandRequest.UserID
 
-	var request dto.VotingRequest
-	if err := c.ShouldBind(&request); err != nil {
-		con.Logger.Error("Error binding request:" + err.Error())
-		con.Service.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали вопрос и как минимум два варианта ответа.  Пример: /create Вопрос | Вариант 1 | Вариант 2")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	request := dto.VotingRequest{
+		Text: CommandRequest.Message,
 	}
-
 	voting, err := con.Service.AddNewVoting(request, channelID, userID)
 	if err != nil {
 		con.Service.PostEphemeralMessage(channelID, userID, "Произошла ошибка при создании голосования.")
@@ -47,18 +42,13 @@ func (con *VotingController) CreateVoting(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (con *VotingController) AddVote(c *gin.Context) {
-	channelID := c.PostForm("channel_id")
-	userID := c.PostForm("user_id")
+func (con *VotingController) AddVote(c *gin.Context, CommandRequest dto.CommandRequest) {
+	channelID := CommandRequest.ChannelID
+	userID := CommandRequest.UserID
 
-	var request dto.VotingRequest
-	if err := c.ShouldBind(&request); err != nil {
-		con.Logger.Error("Error binding request:" + err.Error())
-		con.Service.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали вопрос и как минимум два варианта ответа. Пример: /vote <id голосования> <номер варианта>")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	request := dto.VotingRequest{
+		Text: CommandRequest.Message,
 	}
-
 	con.Logger.Info("Handling /vote command", slog.String("channel_id", channelID), slog.String("user_id", userID))
 
 	_, err := con.Service.AddNewVote(request, channelID, userID)
@@ -76,18 +66,13 @@ func (con *VotingController) AddVote(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (con *VotingController) GetResults(c *gin.Context) {
-	channelID := c.PostForm("channel_id")
-	userID := c.PostForm("user_id")
+func (con *VotingController) GetResults(c *gin.Context, CommandRequest dto.CommandRequest) {
+	channelID := CommandRequest.ChannelID
+	userID := CommandRequest.UserID
 
-	var request dto.VotingRequest
-	if err := c.ShouldBind(&request); err != nil {
-		con.Logger.Error("Error binding request:" + err.Error())
-		con.Service.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали вопрос и как минимум два варианта ответа. Пример: /results <id голосования>")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	request := dto.VotingRequest{
+		Text: CommandRequest.Message,
 	}
-
 	con.Logger.Info("Handling /results command", slog.String("channel_id", channelID), slog.String("user_id", userID))
 
 	votingResults, VotingID, err := con.Service.GetResultsByVotingId(request, channelID, userID)
@@ -110,18 +95,13 @@ func (con *VotingController) GetResults(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (con *VotingController) EndVoting(c *gin.Context) {
-	channelID := c.PostForm("channel_id")
-	userID := c.PostForm("user_id")
+func (con *VotingController) EndVoting(c *gin.Context, CommandRequest dto.CommandRequest) {
+	channelID := CommandRequest.ChannelID
+	userID := CommandRequest.UserID
 
-	var request dto.VotingRequest
-	if err := c.ShouldBind(&request); err != nil {
-		con.Logger.Error("Error binding request:" + err.Error())
-		con.Service.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали id голосования. Пример: /end <id голосования>")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	request := dto.VotingRequest{
+		Text: CommandRequest.Message,
 	}
-
 	con.Logger.Info("Handling /end command", slog.String("channel_id", channelID), slog.String("user_id", userID))
 
 	votingID, err := con.Service.EndVotingByVotingId(request, channelID, userID)
@@ -137,16 +117,12 @@ func (con *VotingController) EndVoting(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (con *VotingController) DeleteVoting(c *gin.Context) {
-	channelID := c.PostForm("channel_id")
-	userID := c.PostForm("user_id")
+func (con *VotingController) DeleteVoting(c *gin.Context, CommandRequest dto.CommandRequest) {
+	channelID := CommandRequest.ChannelID
+	userID := CommandRequest.UserID
 
-	var request dto.VotingRequest
-	if err := c.ShouldBind(&request); err != nil {
-		con.Logger.Error("Error binding request:" + err.Error())
-		con.Service.PostEphemeralMessage(channelID, userID, "Неверный формат запроса.  Убедитесь, что вы указали id голосования. Пример: /delete <id голосования>")
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	request := dto.VotingRequest{
+		Text: CommandRequest.Message,
 	}
 
 	con.Logger.Info("Handling /delete command", slog.String("channel_id", channelID), slog.String("user_id", userID))

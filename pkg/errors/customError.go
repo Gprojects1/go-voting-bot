@@ -10,11 +10,10 @@ const (
 	NoType = ErrorType(iota)
 	BadRequest
 	NotFound
-	NilUserId
-	NilRole
 	NotSaved
 	WrongType
-	EmptyData
+	InvalidFormat
+	UnavailableResource
 )
 
 type ErrorType uint
@@ -86,16 +85,12 @@ func (t ErrorType) Message() string {
 		return "Bad Request: The request could not be understood or was missing required parameters."
 	case NotFound:
 		return "Not Found: The requested resource could not be found."
-	case NilUserId:
-		return "Nil User ID: User ID cannot be nil."
-	case NilRole:
-		return "Nil Role: Role cannot be nil."
 	case NotSaved:
 		return "Can not save to db."
 	case WrongType:
 		return "Wrong data type delivered."
-	case EmptyData:
-		return "Some data is not defined."
+	case InvalidFormat:
+		return "Message has wrong format."
 	default:
 		return "Unknown error occurred."
 	}

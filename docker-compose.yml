@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: mmuser
+      POSTGRES_PASSWORD: mmuser_password
+      POSTGRES_DB: mattermost
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mmuser -d mattermost"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+
+  mattermost:
+    image: mattermost/mattermost-team-edition
+    ports:
+      - "8065:8065"
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: "postgres://mmuser:mmuser_password@postgres:5432/mattermost?sslmode=disable"
+    volumes:
+      - mattermost_data:/mattermost/data
+      - mattermost_config:/mattermost/config
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tarantool:
+    image: tarantool/tarantool:2.10
+    ports:
+      - "3301:3301"
+    volumes:
+      - tarantool_data:/var/lib/tarantool
+      - ./init.lua:/opt/tarantool/init.lua
+    command: tarantool /opt/tarantool/init.lua 
+    networks:
+      - app-network
+    restart: no
+
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    env_file: 
+      - .env
+    environment:
+      TARANTOOL_ADDR: "tarantool:3301"
+      MATTERMOST_URL: "http://mattermost:8065"
+      BOT_TOKEN: ${BOT_TOKEN}
+    networks:
+      - app-network
+    depends_on:
+      mattermost:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  app-network:
+
+volumes:
+  postgres_data:
+  mattermost_data:
+  mattermost_config:
+  tarantool_data:

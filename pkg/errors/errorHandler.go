@@ -14,18 +14,17 @@ func ErrorHandler(c *gin.Context, err error) {
 		status = http.StatusBadRequest
 	case NotFound:
 		status = http.StatusNotFound
-	case NilUserId:
-		status = http.StatusBadRequest
-	case NilRole:
-		status = http.StatusBadRequest
 	case NotSaved:
 		status = http.StatusInternalServerError
 	case WrongType:
 		status = http.StatusBadRequest
-	case EmptyData:
+	case UnavailableResource:
+		status = http.StatusBadRequest
+	case InvalidFormat:
 		status = http.StatusBadRequest
 	default:
 		status = http.StatusInternalServerError
+
 	}
 	c.Writer.WriteHeader(status)
 

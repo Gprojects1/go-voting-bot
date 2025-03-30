@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.LoadConfig("config/config.json")
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
@@ -24,7 +24,10 @@ func main() {
 	logger := slog.New(handler)
 
 	votingRepo, err := repository.NewTarantoolClient(cfg.TarantoolHost, cfg.TarantoolPort, cfg.TarantoolUser, cfg.TarantoolPassword)
-
+	if err != nil {
+		logger.Error("Ошибка создания подключения к базе данных", slog.Any("error", err))
+		return
+	}
 	votingService := &service.VotingService{
 		Client:   model.NewAPIv4Client(cfg.MattermostURL),
 		VoteRepo: votingRepo,
@@ -43,4 +46,5 @@ func main() {
 	}
 
 	mattermostBot.Start()
+	mattermost.SetupGracefulShutdown(mattermostBot)
 }
